@@ -1,6 +1,6 @@
 .data 0x0
 # Printable messages
-msg: .asciiz "Hello, world! Please type a number: "
+msg: .asciiz "Please give your operation:\n> "
 msg2: .asciiz "Result: "
 # Buffer for the entire user input
 buffer: .space 800
@@ -8,12 +8,6 @@ buffer: .space 800
 num: .space 80
 
 .text 0x3000
-
-.macro print(%text)
-	la $a0, %text
-	li $v0, 4
-	syscall
-.end_macro
 
 .globl main
 main:
@@ -35,11 +29,13 @@ main:
 		# If it's a null byte or newline, stop parsing, the input has ended
 		beq $s2, $0, _exit
 		beq $s2, 0x0A, _exit
+		
 		# Check for math symbols
 		beq $s2, 0x2B, addition
 		beq $s2, 0x2D, subtraction
 		beq $s2, 0x2A, multiplication
 		beq $s2, 0x2F, division
+		
 		# If we hit a space, parse the buffer
 		beq $s2, 0x20, parseBuffer
 		# Otherwise, save the current buffer
@@ -54,6 +50,7 @@ main:
 		saveBuffer:
 			sb $s2, ($s1)
 			addi $s1, $s1, 1
+			
 			j parseNextChar
 			
 		# Parse the current number buffer as a double and put the double on the stack
@@ -101,10 +98,17 @@ main:
 			addi $s0, $s0, 1
 			j saveDouble
 		subtraction:
-			jal popNums
-			sub.d $f0, $f0, $f2
-			addi $s0, $s0, 1
-			j saveDouble
+			# Check if the next char is a number - if it is, make it negative instead of doing subtraction
+			lb $t0, 1($s0)
+			blt $t0, 48, subtractionOperation
+			bgt $t0, 57 subtractionOperation
+			j saveBuffer
+			
+			subtractionOperation:
+				jal popNums
+				sub.d $f0, $f0, $f2
+				addi $s0, $s0, 1
+				j saveDouble
 		division:
 			jal popNums
 			div.d $f0, $f0, $f2
